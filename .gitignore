@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# credenciais e conexão nunca entram no repositório
+.env
+*.dsn
+pgpass*
+*.pgpass
+
+# resíduo de teste local
+pgdata/
+*.log
+guarda-teste-*/

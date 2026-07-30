@@ -1,0 +1,122 @@
+name: testes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  postgresql:
+    name: PostgreSQL ${{ matrix.postgres }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ["14", "16", "18"]
+
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: lojateste
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: lojateste
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: instalar o driver
+        run: python -m pip install --quiet "psycopg[binary]"
+
+      - name: instalar o guarda
+        run: |
+          for etapa in 01-base 02-guardas-dml 03-guardas-ddl 04-instalador; do
+            echo "::group::$etapa"
+            psql -v ON_ERROR_STOP=1 -q -f "postgresql/$etapa.sql"
+            echo "::endgroup::"
+          done
+
+      - name: teste de aceitacao no banco
+        run: |
+          set -o pipefail
+          psql -f postgresql/90-teste-aceitacao.sql | tee resultado.txt
+          if grep -q "FALHOU" resultado.txt; then
+            echo "::error::o teste de aceitacao reprovou"
+            exit 1
+          fi
+          grep -E "^ *[0-9]+ \| *[0-9]+$" resultado.txt || true
+
+      - name: testes de unidade do linter
+        working-directory: lint
+        run: python -m unittest test_guarda_lint -v
+
+      - name: linter sobre o proprio SQL do projeto
+        run: python lint/guarda_lint.py --so-erros postgresql sqlserver mysql
+
+      - name: testes do painel
+        working-directory: painel
+        run: python -m unittest test_painel -v
+
+      - name: teste de integracao do painel
+        working-directory: painel
+        env:
+          GUARDA_DSN: "host=127.0.0.1 port=5432 dbname=lojateste user=postgres password=postgres"
+        run: python -m unittest test_integracao -v
+
+  mysql:
+    name: MySQL 8.4
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -proot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: instalar o guarda
+        run: |
+          M="mysql -h 127.0.0.1 -P 3306 -u root -proot"
+          $M < mysql/01-base.sql
+          $M < mysql/02-servidor.sql
+          $M < mysql/03-gerador-triggers.sql
+
+      - name: diagnostico
+        run: mysql -h 127.0.0.1 -P 3306 -u root -proot -e "CALL guarda.diagnostico()"
+
+      - name: teste de aceitacao no banco
+        run: |
+          set -o pipefail
+          mysql -h 127.0.0.1 -P 3306 -u root -proot < mysql/90-teste-aceitacao.sql | tee resultado.txt
+          if grep -q "FALHOU" resultado.txt; then
+            echo "::error::o teste de aceitacao reprovou"
+            exit 1
+          fi

@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Painel do guarda-banco</title>
+<style>
+  :root {
+    --fundo: #0f1216;
+    --fundo-2: #161b22;
+    --fundo-3: #1c232c;
+    --borda: #2a323d;
+    --texto: #dfe5ec;
+    --texto-fraco: #8b97a6;
+    --ok: #3fb950;
+    --alerta: #d29922;
+    --perigo: #f2545b;
+    --acento: #58a6ff;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root {
+      --fundo: #f4f6f8;
+      --fundo-2: #ffffff;
+      --fundo-3: #eceff3;
+      --borda: #d3dae2;
+      --texto: #1b2027;
+      --texto-fraco: #5c6874;
+      --ok: #1a7f37;
+      --alerta: #9a6700;
+      --perigo: #cf222e;
+      --acento: #0969da;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--fundo);
+    color: var(--texto);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+
+  header {
+    display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: baseline;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--borda);
+    background: var(--fundo-2);
+  }
+  header h1 { font-size: 16px; margin: 0; letter-spacing: .02em; }
+  header h1 span { color: var(--texto-fraco); font-weight: 400; }
+  .selo {
+    font: 600 11px/1 var(--mono); text-transform: uppercase; letter-spacing: .08em;
+    padding: 5px 8px; border-radius: 4px; border: 1px solid var(--borda);
+    color: var(--texto-fraco);
+  }
+  .selo.producao { color: var(--perigo); border-color: var(--perigo); }
+  .espaco { margin-left: auto; }
+
+  main { padding: 20px; max-width: 1180px; margin: 0 auto; }
+  section { margin-bottom: 28px; }
+  h2 {
+    font: 600 12px/1 var(--mono); text-transform: uppercase; letter-spacing: .1em;
+    color: var(--texto-fraco); margin: 0 0 12px;
+  }
+
+  /* faixa de situação */
+  .faixa {
+    display: flex; flex-wrap: wrap; gap: 16px; align-items: center;
+    padding: 18px 20px; border-radius: 8px; margin-bottom: 24px;
+    border: 1px solid var(--borda); background: var(--fundo-2);
+    border-left: 5px solid var(--texto-fraco);
+  }
+  .faixa.protegido { border-left-color: var(--ok); }
+  .faixa.parcial { border-left-color: var(--alerta); }
+  .faixa.desprotegido { border-left-color: var(--perigo); }
+  .faixa-titulo { font: 600 19px/1.2 system-ui, sans-serif; }
+  .faixa.protegido .faixa-titulo { color: var(--ok); }
+  .faixa.parcial .faixa-titulo { color: var(--alerta); }
+  .faixa.desprotegido .faixa-titulo { color: var(--perigo); }
+  .faixa-detalhe { color: var(--texto-fraco); font-size: 14px; }
+
+  .numeros { display: flex; gap: 24px; margin-left: auto; text-align: right; }
+  .numeros div { min-width: 60px; }
+  .numeros b { display: block; font: 600 22px/1.1 var(--mono); }
+  .numeros small { color: var(--texto-fraco); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+
+  /* cartões de configuração */
+  .cartoes { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+  .cartao {
+    border: 1px solid var(--borda); border-radius: 6px; padding: 12px 14px;
+    background: var(--fundo-2);
+  }
+  .cartao .chave { font: 11px/1.3 var(--mono); color: var(--texto-fraco); text-transform: uppercase; letter-spacing: .05em; }
+  .cartao .valor { font: 600 19px/1.3 var(--mono); margin: 4px 0 8px; }
+
+  /* tabelas */
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .rolagem { overflow-x: auto; border: 1px solid var(--borda); border-radius: 6px; background: var(--fundo-2); }
+  th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--borda); white-space: nowrap; }
+  th {
+    font: 600 11px/1 var(--mono); text-transform: uppercase; letter-spacing: .07em;
+    color: var(--texto-fraco); background: var(--fundo-3); position: sticky; top: 0;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr:hover { background: var(--fundo-3); }
+  td.numero { font-family: var(--mono); text-align: right; }
+  td.motivo { white-space: normal; color: var(--texto-fraco); font-size: 13px; max-width: 320px; }
+
+  .pilula {
+    display: inline-block; font: 600 11px/1 var(--mono); padding: 5px 8px;
+    border-radius: 999px; text-transform: uppercase; letter-spacing: .05em;
+  }
+  .pilula.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 15%, transparent); }
+  .pilula.alerta { color: var(--alerta); background: color-mix(in srgb, var(--alerta) 18%, transparent); }
+  .pilula.perigo { color: var(--perigo); background: color-mix(in srgb, var(--perigo) 15%, transparent); }
+
+  button {
+    font: 600 13px/1 system-ui, sans-serif; padding: 7px 11px; border-radius: 5px;
+    border: 1px solid var(--borda); background: var(--fundo-3); color: var(--texto);
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--acento); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.perigo { color: var(--perigo); border-color: color-mix(in srgb, var(--perigo) 45%, var(--borda)); }
+  button.perigo:hover:not(:disabled) { background: color-mix(in srgb, var(--perigo) 15%, transparent); border-color: var(--perigo); }
+  button.principal { background: var(--acento); border-color: var(--acento); color: #fff; }
+  button.principal:hover:not(:disabled) { filter: brightness(1.1); }
+
+  /* caixa de dialogo */
+  dialog {
+    border: 1px solid var(--borda); border-radius: 8px; background: var(--fundo-2);
+    color: var(--texto); padding: 0; max-width: 520px; width: calc(100% - 32px);
+  }
+  dialog::backdrop { background: rgba(0,0,0,.6); }
+  .dialogo-corpo { padding: 20px; }
+  .dialogo-corpo h3 { margin: 0 0 6px; font-size: 17px; }
+  .dialogo-corpo p { margin: 0 0 16px; color: var(--texto-fraco); font-size: 14px; }
+  .aviso {
+    border-left: 3px solid var(--perigo); padding: 10px 12px; margin-bottom: 16px;
+    background: color-mix(in srgb, var(--perigo) 10%, transparent); font-size: 14px;
+  }
+  label { display: block; font: 600 12px/1 var(--mono); text-transform: uppercase;
+          letter-spacing: .06em; color: var(--texto-fraco); margin-bottom: 6px; }
+  input, textarea {
+    width: 100%; padding: 9px 10px; border-radius: 5px; font: 14px/1.4 var(--mono);
+    border: 1px solid var(--borda); background: var(--fundo); color: var(--texto);
+    margin-bottom: 14px;
+  }
+  input:focus, textarea:focus { outline: 2px solid var(--acento); outline-offset: -1px; }
+  textarea { resize: vertical; min-height: 68px; }
+  .contador { font: 11px/1 var(--mono); color: var(--texto-fraco); margin: -10px 0 14px; }
+  .contador.faltando { color: var(--alerta); }
+  .dialogo-acoes { display: flex; gap: 10px; justify-content: flex-end; }
+  .campos-lado { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .recado { padding: 10px 12px; border-radius: 5px; margin-bottom: 16px; font-size: 14px; display: none; }
+  .recado.erro { display: block; color: var(--perigo); background: color-mix(in srgb, var(--perigo) 12%, transparent); border: 1px solid var(--perigo); }
+  .recado.ok { display: block; color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); border: 1px solid var(--ok); }
+
+  .vazio { padding: 24px; text-align: center; color: var(--texto-fraco); }
+  footer { padding: 16px 20px 40px; color: var(--texto-fraco); font-size: 13px; max-width: 1180px; margin: 0 auto; }
+  code { font-family: var(--mono); font-size: 13px; background: var(--fundo-3); padding: 1px 5px; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>guarda-banco <span>/ painel</span></h1>
+  <span class="selo" id="selo-engine">...</span>
+  <span class="selo" id="selo-ambiente">...</span>
+  <span class="espaco selo" id="selo-modo">...</span>
+  <button id="botao-recarregar" title="Recarregar tudo">Atualizar</button>
+</header>
+
+<main>
+  <div class="recado" id="recado"></div>
+
+  <div class="faixa" id="faixa">
+    <div>
+      <div class="faixa-titulo" id="faixa-titulo">Carregando</div>
+      <div class="faixa-detalhe" id="faixa-detalhe">Consultando o banco</div>
+    </div>
+    <div class="numeros">
+      <div><b id="n-protegidas">-</b><small>protegidas</small></div>
+      <div><b id="n-desativadas">-</b><small>desativadas</small></div>
+      <div><b id="n-sem-trigger">-</b><small>sem trigger</small></div>
+      <div><b id="n-total">-</b><small>tabelas</small></div>
+    </div>
+  </div>
+
+  <section>
+    <h2>Limites globais</h2>
+    <div class="cartoes" id="cartoes"></div>
+  </section>
+
+  <section>
+    <h2>Tabelas</h2>
+    <div class="rolagem">
+      <table>
+        <thead>
+          <tr>
+            <th>Tabela</th>
+            <th>Situação</th>
+            <th style="text-align:right">Linhas</th>
+            <th style="text-align:right">Limite DELETE</th>
+            <th style="text-align:right">Limite UPDATE</th>
+            <th>Observação</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="corpo-tabelas">
+          <tr><td colspan="7" class="vazio">Carregando</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Últimos eventos</h2>
+    <div class="rolagem">
+      <table>
+        <thead>
+          <tr>
+            <th>Quando</th>
+            <th>Resultado</th>
+            <th>Comando</th>
+            <th>Tabela</th>
+            <th style="text-align:right">Linhas</th>
+            <th>Quem</th>
+            <th>Justificativa</th>
+          </tr>
+        </thead>
+        <tbody id="corpo-eventos">
+          <tr><td colspan="7" class="vazio">Carregando</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<footer>
+  O painel altera <code>guarda.politica</code> e <code>guarda.config</code>. Toda mudança
+  fica registrada em <code>guarda.evento</code> com quem fez e o motivo informado.
+  Desativar a proteção de uma tabela não remove a trigger: o banco continua contando,
+  só para de bloquear. Para remover de verdade existe o <code>99-desinstalar.sql</code>.
+</footer>
+
+<dialog id="dialogo">
+  <form class="dialogo-corpo" id="formulario" method="dialog">
+    <h3 id="dialogo-titulo">Ajustar</h3>
+    <p id="dialogo-texto"></p>
+    <div class="aviso" id="dialogo-aviso" hidden></div>
+
+    <div id="area-limites">
+      <div class="campos-lado">
+        <div>
+          <label for="campo-delete">Limite DELETE</label>
+          <input type="number" id="campo-delete" min="0" placeholder="usa o padrão global">
+        </div>
+        <div>
+          <label for="campo-update">Limite UPDATE</label>
+          <input type="number" id="campo-update" min="0" placeholder="usa o padrão global">
+        </div>
+      </div>
+    </div>
+
+    <div id="area-valor" hidden>
+      <label for="campo-valor">Novo valor</label>
+      <input type="text" id="campo-valor">
+    </div>
+
+    <label for="campo-motivo">Motivo (fica na auditoria)</label>
+    <textarea id="campo-motivo" minlength="15" required
+              placeholder="ex.: staging recriada a cada carga, OS-4821"></textarea>
+    <div class="contador" id="contador-motivo">mínimo de 15 caracteres</div>
+
+    <div class="dialogo-acoes">
+      <button type="button" id="botao-cancelar">Cancelar</button>
+      <button type="submit" class="principal" id="botao-confirmar">Confirmar</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+"use strict";
+
+const TOKEN = "{{TOKEN}}";
+const MOTIVO_MINIMO = 15;
+
+let estado = null;
+let tabelas = [];
+let acaoAtual = null;
+
+const el = (id) => document.getElementById(id);
+const numero = (n) => Number(n || 0).toLocaleString("pt-BR");
+
+function recado(texto, tipo) {
+  const caixa = el("recado");
+  caixa.textContent = texto;
+  caixa.className = "recado " + (tipo || "");
+  if (tipo === "ok") setTimeout(() => { caixa.className = "recado"; }, 4000);
+}
+
+async function pedir(caminho, opcoes) {
+  const resposta = await fetch(caminho, opcoes);
+  const dados = await resposta.json().catch(() => ({}));
+  if (!resposta.ok) throw new Error(dados.erro || ("HTTP " + resposta.status));
+  return dados;
+}
+
+async function enviar(caminho, corpo) {
+  return pedir(caminho, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Guarda-Token": TOKEN },
+    body: JSON.stringify(corpo),
+  });
+}
+
+// ---------------------------------------------------------------- desenho
+function desenharFaixa() {
+  const r = estado.resumo;
+  const faixa = el("faixa");
+  const titulos = {
+    protegido: ["protegido", "Proteção ativa em todas as tabelas",
+                "Nenhuma tabela está fora do alcance do guard."],
+    parcial: ["parcial", "Proteção parcial",
+              "Parte das tabelas está fora. Veja a coluna Situação abaixo."],
+    desprotegido: ["desprotegido", "Proteção desligada",
+                   "Nenhuma tabela está protegida neste momento."],
+    vazio: ["", "Nenhuma tabela encontrada",
+            "O banco não tem tabela de usuário, ou o painel não tem permissão de leitura no catálogo."],
+  };
+  const [classe, titulo, detalhe] = titulos[r.situacao] || titulos.vazio;
+  faixa.className = "faixa " + classe;
+  el("faixa-titulo").textContent = titulo;
+  el("faixa-detalhe").textContent = detalhe;
+  el("n-protegidas").textContent = numero(r.protegidas);
+  el("n-desativadas").textContent = numero(r.desativadas);
+  el("n-sem-trigger").textContent = numero(r.sem_trigger);
+  el("n-total").textContent = numero(r.total);
+
+  el("selo-engine").textContent = estado.engine;
+  const ambiente = estado.config.ambiente || "?";
+  const selo = el("selo-ambiente");
+  selo.textContent = ambiente;
+  selo.className = "selo" + (ambiente === "producao" ? " producao" : "");
+  el("selo-modo").textContent = estado.somente_leitura
+    ? "somente leitura" : estado.quem;
+}
+
+const CARTOES = [
+  ["limite_delete_padrao", "Limite DELETE padrão"],
+  ["limite_update_padrao", "Limite UPDATE padrão"],
+  ["registrar_acima_de", "Audita acima de"],
+  ["exigir_justificativa", "Exige justificativa"],
+  ["proteger_ddl", "Protege DDL"],
+];
+
+function desenharCartoes() {
+  const destino = el("cartoes");
+  destino.textContent = "";
+  for (const [chave, rotulo] of CARTOES) {
+    if (!(chave in estado.config)) continue;
+    const cartao = document.createElement("div");
+    cartao.className = "cartao";
+
+    const nome = document.createElement("div");
+    nome.className = "chave";
+    nome.textContent = rotulo;
+
+    const valor = document.createElement("div");
+    valor.className = "valor";
+    valor.textContent = estado.config[chave];
+
+    const botao = document.createElement("button");
+    botao.textContent = "Alterar";
+    botao.disabled = estado.somente_leitura;
+    botao.onclick = () => abrirDialogoConfig(chave, rotulo, estado.config[chave]);
+
+    cartao.append(nome, valor, botao);
+    destino.append(cartao);
+  }
+}
+
+function situacaoDaTabela(t) {
+  if (!t.instalada) return ["perigo", "sem trigger"];
+  if (!t.ativo) return ["alerta", "desativada"];
+  return ["ok", "protegida"];
+}
+
+function desenharTabelas() {
+  const corpo = el("corpo-tabelas");
+  corpo.textContent = "";
+
+  if (tabelas.length === 0) {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 7;
+    td.className = "vazio";
+    td.textContent = "Nenhuma tabela encontrada.";
+    tr.append(td);
+    corpo.append(tr);
+    return;
+  }
+
+  for (const t of tabelas) {
+    const tr = document.createElement("tr");
+    const [classe, rotulo] = situacaoDaTabela(t);
+
+    const nome = document.createElement("td");
+    nome.textContent = t.esquema + "." + t.tabela;
+
+    const situacao = document.createElement("td");
+    const pilula = document.createElement("span");
+    pilula.className = "pilula " + classe;
+    pilula.textContent = rotulo;
+    situacao.append(pilula);
+
+    const linhas = document.createElement("td");
+    linhas.className = "numero";
+    linhas.textContent = numero(t.linhas_estimadas);
+
+    const ld = document.createElement("td");
+    ld.className = "numero";
+    ld.textContent = t.limite_delete === null ? "padrão" : numero(t.limite_delete);
+
+    const lu = document.createElement("td");
+    lu.className = "numero";
+    lu.textContent = t.limite_update === null ? "padrão" : numero(t.limite_update);
+
+    const obs = document.createElement("td");
+    obs.className = "motivo";
+    obs.textContent = t.observacao || "";
+
+    const acoes = document.createElement("td");
+    const ajustar = document.createElement("button");
+    ajustar.textContent = "Limites";
+    ajustar.disabled = estado.somente_leitura;
+    ajustar.onclick = () => abrirDialogoLimites(t);
+
+    const alternar = document.createElement("button");
+    alternar.textContent = t.ativo ? "Desativar" : "Ativar";
+    alternar.className = t.ativo ? "perigo" : "";
+    alternar.disabled = estado.somente_leitura || !t.instalada;
+    if (!t.instalada) {
+      alternar.title = "A trigger não está instalada nesta tabela. "
+        + "Rode o instalador antes: guarda.instalar()";
+    }
+    alternar.onclick = () => abrirDialogoAlternar(t);
+
+    acoes.append(ajustar, document.createTextNode(" "), alternar);
+    tr.append(nome, situacao, linhas, ld, lu, obs, acoes);
+    corpo.append(tr);
+  }
+}
+
+function desenharEventos(eventos) {
+  const corpo = el("corpo-eventos");
+  corpo.textContent = "";
+
+  if (eventos.length === 0) {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 7;
+    td.className = "vazio";
+    td.textContent = "Nada registrado ainda.";
+    tr.append(td);
+    corpo.append(tr);
+    return;
+  }
+
+  const cores = { bloqueado: "perigo", liberado: "alerta", configuracao: "alerta", permitido: "ok" };
+
+  for (const e of eventos) {
+    const tr = document.createElement("tr");
+    const cel = (texto, classe) => {
+      const td = document.createElement("td");
+      if (classe) td.className = classe;
+      td.textContent = texto;
+      return td;
+    };
+
+    const resultado = document.createElement("td");
+    const pilula = document.createElement("span");
+    pilula.className = "pilula " + (cores[e.resultado] || "");
+    pilula.textContent = e.resultado;
+    resultado.append(pilula);
+
+    tr.append(
+      cel(e.ocorrido_em),
+      resultado,
+      cel(e.comando),
+      cel(e.tabela ? (e.esquema || "") + "." + e.tabela : ""),
+      cel(e.linhas === null ? "" : numero(e.linhas), "numero"),
+      cel(e.usuario || ""),
+      cel(e.justificativa || "", "motivo"),
+    );
+    corpo.append(tr);
+  }
+}
+
+// ------------------------------------------------------------- dialogos
+function conferirMotivo() {
+  const texto = el("campo-motivo").value.trim();
+  const faltam = MOTIVO_MINIMO - texto.length;
+  const contador = el("contador-motivo");
+  if (faltam > 0) {
+    contador.textContent = "faltam " + faltam + " caractere(s)";
+    contador.className = "contador faltando";
+    el("botao-confirmar").disabled = true;
+  } else {
+    contador.textContent = texto.length + " caracteres";
+    contador.className = "contador";
+    el("botao-confirmar").disabled = false;
+  }
+}
+
+function abrirDialogo({ titulo, texto, aviso, mostrarLimites, mostrarValor, valores, acao }) {
+  acaoAtual = acao;
+  el("dialogo-titulo").textContent = titulo;
+  el("dialogo-texto").textContent = texto;
+
+  const caixaAviso = el("dialogo-aviso");
+  caixaAviso.hidden = !aviso;
+  caixaAviso.textContent = aviso || "";
+
+  el("area-limites").hidden = !mostrarLimites;
+  el("area-valor").hidden = !mostrarValor;
+
+  el("campo-delete").value = valores?.limite_delete ?? "";
+  el("campo-update").value = valores?.limite_update ?? "";
+  el("campo-valor").value = valores?.valor ?? "";
+  el("campo-motivo").value = "";
+
+  conferirMotivo();
+  el("dialogo").showModal();
+  el("campo-motivo").focus();
+}
+
+function abrirDialogoLimites(t) {
+  abrirDialogo({
+    titulo: "Limites de " + t.esquema + "." + t.tabela,
+    texto: "Deixe em branco para usar o limite global. Acima do limite, o comando "
+         + "é bloqueado até alguém chamar guarda.liberar().",
+    mostrarLimites: true,
+    valores: t,
+    acao: (dados) => enviar("/api/tabela", {
+      esquema: t.esquema,
+      tabela: t.tabela,
+      ativo: t.ativo,
+      limite_delete: dados.limite_delete,
+      limite_update: dados.limite_update,
+      motivo: dados.motivo,
+    }),
+  });
+}
+
+function abrirDialogoAlternar(t) {
+  const desativando = t.ativo;
+  abrirDialogo({
+    titulo: (desativando ? "Desativar" : "Ativar") + " proteção de "
+          + t.esquema + "." + t.tabela,
+    texto: desativando
+      ? "A trigger continua instalada e continua contando, mas para de bloquear."
+      : "A tabela volta a bloquear DELETE e UPDATE acima do limite.",
+    aviso: desativando
+      ? "Com a proteção desativada, um DELETE sem WHERE apaga as "
+        + numero(t.linhas_estimadas) + " linhas estimadas desta tabela sem aviso. "
+        + "Reative assim que a carga terminar."
+      : null,
+    mostrarLimites: false,
+    valores: t,
+    acao: (dados) => enviar("/api/tabela", {
+      esquema: t.esquema,
+      tabela: t.tabela,
+      ativo: !t.ativo,
+      limite_delete: t.limite_delete,
+      limite_update: t.limite_update,
+      motivo: dados.motivo,
+    }),
+  });
+}
+
+function abrirDialogoConfig(chave, rotulo, valorAtual) {
+  const booleana = ["exigir_justificativa", "proteger_ddl", "exigir_performance_schema"]
+    .includes(chave);
+  abrirDialogo({
+    titulo: rotulo,
+    texto: booleana
+      ? "Aceita apenas sim ou nao. Vale para o banco inteiro."
+      : "Vale para toda tabela que não tenha limite próprio.",
+    aviso: chave === "proteger_ddl" && valorAtual === "sim"
+      ? "Colocar 'nao' aqui faz o guard parar de bloquear DROP TABLE e DROP COLUMN "
+        + "no banco inteiro. Ele continua registrando."
+      : null,
+    mostrarLimites: false,
+    mostrarValor: true,
+    valores: { valor: valorAtual },
+    acao: (dados) => enviar("/api/config", {
+      chave: chave,
+      valor: el("campo-valor").value,
+      motivo: dados.motivo,
+    }),
+  });
+}
+
+// ------------------------------------------------------------- carregar
+async function carregar() {
+  try {
+    const [novoEstado, novasTabelas, eventos] = await Promise.all([
+      pedir("/api/estado"),
+      pedir("/api/tabelas"),
+      pedir("/api/eventos?limite=60"),
+    ]);
+    estado = novoEstado;
+    tabelas = novasTabelas;
+    desenharFaixa();
+    desenharCartoes();
+    desenharTabelas();
+    desenharEventos(eventos);
+  } catch (e) {
+    recado("Não consegui carregar: " + e.message, "erro");
+  }
+}
+
+el("formulario").addEventListener("submit", async (evento) => {
+  evento.preventDefault();
+  const motivo = el("campo-motivo").value.trim();
+  if (motivo.length < MOTIVO_MINIMO) return;
+
+  const botao = el("botao-confirmar");
+  botao.disabled = true;
+  try {
+    await acaoAtual({
+      motivo: motivo,
+      limite_delete: el("campo-delete").value === "" ? null : el("campo-delete").value,
+      limite_update: el("campo-update").value === "" ? null : el("campo-update").value,
+    });
+    el("dialogo").close();
+    recado("Alteração aplicada e registrada na auditoria.", "ok");
+    await carregar();
+  } catch (e) {
+    recado("Não deu: " + e.message, "erro");
+    botao.disabled = false;
+  }
+});
+
+el("botao-cancelar").onclick = () => el("dialogo").close();
+el("campo-motivo").addEventListener("input", conferirMotivo);
+el("botao-recarregar").onclick = carregar;
+
+carregar();
+</script>
+</body>
+</html>

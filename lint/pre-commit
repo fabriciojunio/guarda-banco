@@ -1,0 +1,49 @@
+#!/bin/sh
+# Hook de pre-commit: roda o guarda-lint só nos arquivos .sql do commit.
+#
+# Instalação:
+#   cp guarda-banco/lint/pre-commit .git/hooks/pre-commit
+#   chmod +x .git/hooks/pre-commit
+#
+# Para pular em um commit específico (e ter que explicar depois):
+#   git commit --no-verify
+
+set -e
+
+LINT="$(git rev-parse --show-toplevel)/guarda-banco/lint/guarda_lint.py"
+
+if [ ! -f "$LINT" ]; then
+    echo "guarda-lint nao encontrado em $LINT, pulando." >&2
+    exit 0
+fi
+
+ARQUIVOS=$(git diff --cached --name-only --diff-filter=ACM | grep -i '\.sql$' || true)
+
+if [ -z "$ARQUIVOS" ]; then
+    exit 0
+fi
+
+# Analisa a versão que está no índice, não a do disco: é ela que vai no commit.
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+
+for arquivo in $ARQUIVOS; do
+    mkdir -p "$TMP/$(dirname "$arquivo")"
+    git show ":$arquivo" > "$TMP/$arquivo"
+done
+
+echo "guarda-lint: verificando $(echo "$ARQUIVOS" | wc -l) arquivo(s) .sql"
+
+if ! (cd "$TMP" && python "$LINT" $ARQUIVOS); then
+    cat >&2 <<'FIM'
+
+Commit interrompido pelo guarda-lint.
+
+Corrija os erros acima, ou, se o comando estiver certo mesmo, silencie a
+regra na linha anterior explicando o motivo:
+
+    -- guarda-lint: ignorar delete-sem-where (expurgo aprovado no OS-4821)
+
+FIM
+    exit 1
+fi
