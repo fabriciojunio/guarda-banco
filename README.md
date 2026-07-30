@@ -1,5 +1,7 @@
 # guarda-banco
 
+[![testes](https://github.com/fabriciojunio/guarda-banco/actions/workflows/testes.yml/badge.svg)](https://github.com/fabriciojunio/guarda-banco/actions/workflows/testes.yml)
+
 Proteção contra `DELETE` e `UPDATE` acidentais dentro do servidor de banco.
 
 A proteção fica no banco, não no cliente. Isso é o ponto: se cada pessoa
@@ -66,12 +68,18 @@ das triggers de statement. O MySQL é o mais limitado, e vale ler
 [docs/limitacoes.md](docs/limitacoes.md) antes de prometer proteção para a
 equipe.
 
-Sobre o que já rodou: a parte de PostgreSQL foi executada de ponta a ponta
-em PostgreSQL 18, com os 17 casos do teste de aceitação passando, mais o
-painel contra o mesmo banco. MySQL e SQL Server estão escritos e revisados,
-e o MySQL roda na CI. **A parte de SQL Server ainda não foi executada em um
-servidor de verdade**: rode o `sqlserver/90-teste-aceitacao.sql` em
-homologação antes de usar.
+Sobre o que já rodou de verdade: PostgreSQL 14, 16 e 18 e MySQL 8.4 são
+exercitados na CI a cada push, com o teste de aceitação rodando dentro do
+banco. **A parte de SQL Server ainda não foi executada em um servidor de
+verdade**, porque não há imagem prática para rodar na CI e eu não tinha uma
+instância à mão: ela está escrita e revisada, mas rode o
+`sqlserver/90-teste-aceitacao.sql` em homologação antes de confiar nela.
+
+Uma coisa que a CI mostrou e vale saber antes de instalar no MySQL: o
+`sql_safe_updates` barra `DELETE` e `UPDATE` sem `WHERE` com chave **antes**
+de a trigger rodar, e `guarda.liberar()` não passa por cima dele. Ou seja,
+no MySQL o expurgo grande sempre sai em lote. Está explicado em
+[docs/operacao.md](docs/operacao.md).
 
 ## Instalação
 
@@ -229,9 +237,9 @@ O que está coberto hoje:
 | Linter | 40 | não |
 | Painel, HTTP e validações | 35 | não |
 | Painel, integração | 8 | sim |
-| Aceitação PostgreSQL, dentro do banco | 17 casos | sim |
-| Aceitação SQL Server, dentro do banco | 16 casos | sim, não executado ainda |
-| Aceitação MySQL, dentro do banco | 11 casos | sim, roda na CI |
+| Aceitação PostgreSQL, dentro do banco | 17 casos | sim, roda na CI em 14, 16 e 18 |
+| Aceitação MySQL, dentro do banco | 12 casos | sim, roda na CI em 8.4 |
+| Aceitação SQL Server, dentro do banco | 16 casos | sim, **não executado ainda** |
 
 O teste de integração do painel é o que fecha o ciclo: desativa pela API,
 confirma que o `DELETE` grande passa a ser aceito pelo banco, reativa e
