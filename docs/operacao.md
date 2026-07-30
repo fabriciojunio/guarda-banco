@@ -45,11 +45,23 @@ para pensar, ela fecha e é só chamar de novo.
 START TRANSACTION;
 CALL guarda.liberar('expurgo de logs anteriores a 2023, OS-4821');
 
-DELETE FROM log_acesso WHERE criado_em < '2023-01-01';
+DELETE FROM log_acesso WHERE criado_em < '2023-01-01' LIMIT 5000;
 -- olhe as linhas afetadas
 
 COMMIT;   -- ou ROLLBACK
 ```
+
+Repare no `LIMIT`. No MySQL existem duas defesas em série, e a liberação
+vale só para a de dentro:
+
+- `sql_safe_updates`, que é do servidor, recusa `UPDATE` e `DELETE` sem
+  `WHERE` em coluna com chave e sem `LIMIT`. **`guarda.liberar()` não
+  desliga isso**, e o erro que aparece é o 1175.
+- o guard, que conta linhas, é o que a liberação destrava.
+
+Ou seja, no MySQL o expurgo grande sempre sai em lote, com `LIMIT` ou com
+filtro em chave. Se você liberou e continua levando erro, olhe a mensagem:
+se ela fala em "safe update mode", o problema é o comando, não a liberação.
 
 ## Melhor ainda: apague em lotes
 

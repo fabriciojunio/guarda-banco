@@ -68,6 +68,13 @@ de cada engine terminam com as consultas que mostram essa lista.
 
 Aqui as limitações são maiores, e é honesto dizer isso antes de instalar.
 
+- **`guarda.liberar()` não passa por cima do `sql_safe_updates`.** São duas
+  defesas em série, e a nativa vem primeiro. Depois de liberar, um
+  `DELETE FROM tabela` sem `WHERE` continua recusado pelo servidor com o
+  erro 1175. Para a operação passar, ela precisa de `WHERE` em coluna com
+  chave, ou de `LIMIT`. Na prática isso é bom: força o expurgo a ser em
+  lotes. Mas confunde quem liberou e continuou levando erro, então está no
+  runbook.
 - **`ON DELETE CASCADE` não dispara trigger.** Está na documentação do
   MySQL. Um `DELETE` no pai apaga as filhas sem o guard ver nada. Este é
   o ponto cego mais sério. Mitigações:

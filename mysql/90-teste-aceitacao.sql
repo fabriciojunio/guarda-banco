@@ -70,7 +70,46 @@ INSERT INTO guarda.politica (esquema, tabela, limite_delete, limite_update) VALU
 
 DELIMITER $$
 
+-- Aceita bloqueio de qualquer camada, e diz qual pegou.
+--
+-- No MySQL existem duas defesas em série, e a de fora pega primeiro: o
+-- sql_safe_updates recusa DELETE/UPDATE sem WHERE com chave antes de a
+-- trigger ser chamada. Exigir a mensagem do guard nesses casos seria
+-- reprovar o sistema por estar protegido demais.
 CREATE PROCEDURE guarda_teste.espera_bloqueio(IN p_caso VARCHAR(60), IN p_sql TEXT)
+BEGIN
+    DECLARE v_erro TINYINT DEFAULT 0;
+    DECLARE v_msg  TEXT DEFAULT '';
+    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION
+    BEGIN
+        GET DIAGNOSTICS CONDITION 1 v_msg = MESSAGE_TEXT;
+        SET v_erro = 1;
+    END;
+
+    SET @sql_do_teste = p_sql;
+    PREPARE st FROM @sql_do_teste;
+    EXECUTE st;
+    DEALLOCATE PREPARE st;
+
+    IF v_erro = 1 AND v_msg LIKE 'GUARDA:%' THEN
+        INSERT INTO guarda_teste.resultado
+            VALUES (p_caso, 'OK', CONCAT('guard: ', LEFT(v_msg, 180)));
+    ELSEIF v_erro = 1 AND v_msg LIKE '%safe update%' THEN
+        INSERT INTO guarda_teste.resultado
+            VALUES (p_caso, 'OK', 'sql_safe_updates pegou antes da trigger');
+    ELSEIF v_erro = 1 THEN
+        INSERT INTO guarda_teste.resultado
+            VALUES (p_caso, 'FALHOU', CONCAT('erro inesperado: ', LEFT(v_msg, 200)));
+    ELSE
+        INSERT INTO guarda_teste.resultado
+            VALUES (p_caso, 'FALHOU', 'passou e deveria ter sido bloqueado');
+    END IF;
+END $$
+
+-- Exige que o bloqueio tenha vindo do contador de linhas do guard, e não
+-- do sql_safe_updates. Para isso o comando de teste precisa passar pela
+-- defesa nativa, o que se consegue com LIMIT ou com WHERE em chave.
+CREATE PROCEDURE guarda_teste.espera_bloqueio_guarda(IN p_caso VARCHAR(60), IN p_sql TEXT)
 BEGIN
     DECLARE v_erro TINYINT DEFAULT 0;
     DECLARE v_msg  TEXT DEFAULT '';
@@ -89,7 +128,7 @@ BEGIN
         INSERT INTO guarda_teste.resultado VALUES (p_caso, 'OK', LEFT(v_msg, 200));
     ELSEIF v_erro = 1 THEN
         INSERT INTO guarda_teste.resultado
-            VALUES (p_caso, 'FALHOU', CONCAT('erro inesperado: ', LEFT(v_msg, 200)));
+            VALUES (p_caso, 'FALHOU', CONCAT('quem bloqueou nao foi o guard: ', LEFT(v_msg, 170)));
     ELSE
         INSERT INTO guarda_teste.resultado
             VALUES (p_caso, 'FALHOU', 'passou e deveria ter sido bloqueado');
@@ -126,20 +165,24 @@ DELIMITER ;
 -- ---------------------------------------------------------------------
 CALL guarda.bloquear();
 
+-- Estes dois são pegos pelo sql_safe_updates, que vem antes da trigger
 CALL guarda_teste.espera_bloqueio('A1 DELETE sem WHERE',
     'DELETE FROM guarda_teste.item');
 
 CALL guarda_teste.espera_bloqueio('A2 UPDATE sem WHERE',
     'UPDATE guarda_teste.item SET valor = 0');
 
-CALL guarda_teste.espera_bloqueio('A3 WHERE amplo demais',
-    'DELETE FROM guarda_teste.item WHERE valor > 0');
+-- Daqui para baixo, com LIMIT para passar pelo sql_safe_updates e chegar
+-- na trigger, quem tem que bloquear é o contador de linhas do guard
+CALL guarda_teste.espera_bloqueio_guarda('A3 WHERE amplo demais',
+    'DELETE FROM guarda_teste.item WHERE valor > 0 LIMIT 2000');
 
 CALL guarda_teste.espera_sucesso('A3b DELETE pequeno passa',
     'DELETE FROM guarda_teste.item WHERE id <= 50');
 
-CALL guarda_teste.espera_bloqueio('A8 OR no lugar de AND',
-    'UPDATE guarda_teste.pedido SET status = ''cancelado'' WHERE id = 7 OR status = ''aberto''');
+CALL guarda_teste.espera_bloqueio_guarda('A8 OR no lugar de AND',
+    'UPDATE guarda_teste.pedido SET status = ''cancelado''
+      WHERE id = 7 OR status = ''aberto'' LIMIT 2000');
 
 CALL guarda_teste.espera_bloqueio('Justificativa curta recusada',
     'CALL guarda.liberar(''oi'')');
@@ -147,7 +190,14 @@ CALL guarda_teste.espera_bloqueio('Justificativa curta recusada',
 CALL guarda.liberar('teste de aceitacao do guarda, ticket interno');
 
 CALL guarda_teste.espera_sucesso('Liberacao destrava DELETE grande',
-    'DELETE FROM guarda_teste.item WHERE valor > 0');
+    'DELETE FROM guarda_teste.item WHERE valor > 0 LIMIT 2000');
+
+-- Pegadinha operacional que vale ter fixada em teste: a liberação vale
+-- para o guard, não para o sql_safe_updates. Mesmo liberado, comando sem
+-- WHERE com chave e sem LIMIT continua recusado pelo servidor.
+CALL guarda.liberar('conferindo que liberar nao passa por cima do safe updates');
+CALL guarda_teste.espera_bloqueio('Liberacao nao burla o sql_safe_updates',
+    'DELETE FROM guarda_teste.item');
 
 CALL guarda.bloquear();
 
@@ -193,4 +243,7 @@ SELECT SUM(situacao = 'OK')      AS ok,
 -- ---------------------------------------------------------------------
 DELETE FROM guarda.politica WHERE esquema = 'guarda_teste';
 DELETE FROM guarda.evento   WHERE esquema = 'guarda_teste';
+DROP PROCEDURE IF EXISTS guarda_teste.espera_bloqueio;
+DROP PROCEDURE IF EXISTS guarda_teste.espera_bloqueio_guarda;
+DROP PROCEDURE IF EXISTS guarda_teste.espera_sucesso;
 DROP DATABASE guarda_teste;
