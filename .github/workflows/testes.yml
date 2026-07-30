@@ -86,36 +86,44 @@ jobs:
     name: MySQL 8.4
     runs-on: ubuntu-latest
 
-    services:
-      mysql:
-        image: mysql:8.4
-        env:
-          MYSQL_ROOT_PASSWORD: root
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd "mysqladmin ping -proot"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 15
-
     steps:
       - uses: actions/checkout@v4
 
+      # O contêiner é subido na mão, e não com services, para poder usar o
+      # cliente mysql de dentro dele. O runner do Ubuntu traz o cliente do
+      # MariaDB, que não fecha handshake com o MySQL 8.4 e falha com
+      # "Lost connection at reading initial communication packet".
+      - name: subir o MySQL
+        run: |
+          docker run -d --name guardamysql \
+            -e MYSQL_ROOT_PASSWORD=root \
+            -p 3306:3306 mysql:8.4
+          for tentativa in $(seq 1 60); do
+            if docker exec guardamysql mysqladmin ping -uroot -proot --silent; then
+              echo "servidor pronto na tentativa $tentativa"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::o MySQL nao subiu"
+          docker logs guardamysql | tail -30
+          exit 1
+
       - name: instalar o guarda
         run: |
-          M="mysql -h 127.0.0.1 -P 3306 -u root -proot"
-          $M < mysql/01-base.sql
-          $M < mysql/02-servidor.sql
-          $M < mysql/03-gerador-triggers.sql
+          for etapa in 01-base 02-servidor 03-gerador-triggers; do
+            echo "::group::$etapa"
+            docker exec -i guardamysql mysql -uroot -proot < "mysql/$etapa.sql"
+            echo "::endgroup::"
+          done
 
       - name: diagnostico
-        run: mysql -h 127.0.0.1 -P 3306 -u root -proot -e "CALL guarda.diagnostico()"
+        run: docker exec guardamysql mysql -uroot -proot -e "CALL guarda.diagnostico()"
 
       - name: teste de aceitacao no banco
         run: |
           set -o pipefail
-          mysql -h 127.0.0.1 -P 3306 -u root -proot < mysql/90-teste-aceitacao.sql | tee resultado.txt
+          docker exec -i guardamysql mysql -uroot -proot < mysql/90-teste-aceitacao.sql | tee resultado.txt
           if grep -q "FALHOU" resultado.txt; then
             echo "::error::o teste de aceitacao reprovou"
             exit 1
