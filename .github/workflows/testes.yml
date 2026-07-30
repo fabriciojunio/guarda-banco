@@ -98,14 +98,23 @@ jobs:
           docker run -d --name guardamysql \
             -e MYSQL_ROOT_PASSWORD=root \
             -p 3306:3306 mysql:8.4
+          # Espera por uma consulta autenticada, não por mysqladmin ping. O
+          # entrypoint do MySQL sobe um servidor temporário antes de definir
+          # a senha do root, e nessa janela o ping responde mas a conexão com
+          # senha ainda dá "Access denied".
           for tentativa in $(seq 1 60); do
-            if docker exec guardamysql mysqladmin ping -uroot -proot --silent; then
-              echo "servidor pronto na tentativa $tentativa"
+            if docker exec guardamysql mysql -uroot -proot -e "select 1" > /dev/null 2>&1; then
+              echo "servidor pronto e autenticando na tentativa $tentativa"
               exit 0
+            fi
+            if [ "$(docker inspect -f '{{.State.Running}}' guardamysql)" != "true" ]; then
+              echo "::error::o container do MySQL morreu"
+              docker logs guardamysql | tail -30
+              exit 1
             fi
             sleep 2
           done
-          echo "::error::o MySQL nao subiu"
+          echo "::error::o MySQL nao ficou pronto em 120 segundos"
           docker logs guardamysql | tail -30
           exit 1
 
