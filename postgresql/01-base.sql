@@ -46,7 +46,7 @@ insert into guarda.config (chave, valor, descricao) values
 
     ('proteger_ddl',
      'sim',
-     'Se nao, os event triggers de DDL param de bloquear (continuam registrando).')
+     'Se não, os event triggers de DDL param de bloquear (continuam registrando).')
 on conflict (chave) do nothing;
 
 -- ---------------------------------------------------------------------

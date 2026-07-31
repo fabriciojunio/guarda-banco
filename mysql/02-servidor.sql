@@ -78,7 +78,7 @@ CREATE OR REPLACE VIEW guarda.como_liberar AS
 SELECT 'START TRANSACTION;' AS passo_1,
        "CALL guarda.liberar('motivo com pelo menos 15 caracteres');" AS passo_2,
        'seu comando aqui;' AS passo_3,
-       'confira o numero de linhas afetadas' AS passo_4,
+       'confira o número de linhas afetadas' AS passo_4,
        'COMMIT; ou ROLLBACK;' AS passo_5;
 
 DELIMITER $$
@@ -93,7 +93,7 @@ BEGIN
            IF(@@performance_schema = 1, 'OK', 'PROBLEMA') AS situacao,
            IF(@@performance_schema = 1,
               'ligado',
-              'desligado: o contador de linhas por comando nao funciona') AS detalhe
+              'desligado: o contador de linhas por comando não funciona') AS detalhe
     UNION ALL
     SELECT 'events_statements_current',
            IF((SELECT ENABLED FROM performance_schema.setup_consumers
@@ -108,27 +108,27 @@ BEGIN
            IF(@@GLOBAL.sql_safe_updates = 1, 'OK', 'PROBLEMA'),
            'defesa nativa contra DELETE/UPDATE sem WHERE'
     UNION ALL
-    SELECT 'autocommit da sua sessao',
-           IF(@@autocommit = 1, 'ATENCAO', 'OK'),
+    SELECT 'autocommit da sua sessão',
+           IF(@@autocommit = 1, 'ATENÇÃO', 'OK'),
            IF(@@autocommit = 1,
               'ligado: sem chance de ROLLBACK depois de ver o resultado',
               'desligado')
     UNION ALL
-    SELECT 'tabelas sem protecao',
-           IF((SELECT COUNT(*) FROM guarda.sem_protecao) = 0, 'OK', 'ATENCAO'),
+    SELECT 'tabelas sem proteção',
+           IF((SELECT COUNT(*) FROM guarda.sem_protecao) = 0, 'OK', 'ATENÇÃO'),
            CONCAT((SELECT COUNT(*) FROM guarda.sem_protecao), ' tabela(s). Veja guarda.sem_protecao')
     UNION ALL
     SELECT 'FKs em cascata (ponto cego)',
-           IF((SELECT COUNT(*) FROM guarda.fks_em_cascata) = 0, 'OK', 'ATENCAO'),
+           IF((SELECT COUNT(*) FROM guarda.fks_em_cascata) = 0, 'OK', 'ATENÇÃO'),
            CONCAT((SELECT COUNT(*) FROM guarda.fks_em_cascata),
-                  ' FK(s). MySQL nao dispara trigger em cascata de FK. Veja guarda.fks_em_cascata')
+                  ' FK(s). MySQL não dispara trigger em cascata de FK. Veja guarda.fks_em_cascata')
     UNION ALL
     SELECT 'engine das tabelas',
            IF((SELECT COUNT(*) FROM information_schema.TABLES
                 WHERE TABLE_TYPE = 'BASE TABLE' AND ENGINE <> 'InnoDB'
                   AND TABLE_SCHEMA NOT IN ('mysql','information_schema',
-                                           'performance_schema','sys')) = 0, 'OK', 'ATENCAO'),
-           'tabela MyISAM nao tem transacao: bloqueio nao desfaz o que ja foi feito';
+                                           'performance_schema','sys')) = 0, 'OK', 'ATENÇÃO'),
+           'tabela MyISAM não tem transação: bloqueio não desfaz o que já foi feito';
 END $$
 
 DELIMITER ;

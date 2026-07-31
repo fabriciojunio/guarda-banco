@@ -1,4 +1,4 @@
-# Sobe um PostgreSQL descartável, instala o guarda e roda o teste de aceitação.
+﻿# Sobe um PostgreSQL descartável, instala o guarda e roda o teste de aceitação.
 #
 # Serve para validar o sistema sem tocar em nenhum banco da empresa. O
 # cluster vai para uma pasta temporária e é derrubado no fim, a menos que
@@ -33,7 +33,7 @@ if (-not $PastaBin) {
 }
 
 if (-not $PastaBin -or -not (Test-Path (Join-Path $PastaBin "initdb.exe"))) {
-    Write-Error "Nao encontrei os binarios do PostgreSQL. Instale com 'scoop install postgresql' ou passe -PastaBin."
+    Write-Error "Não encontrei os binários do PostgreSQL. Instale com 'scoop install postgresql' ou passe -PastaBin."
 }
 
 $initdb   = Join-Path $PastaBin "initdb.exe"
@@ -48,11 +48,11 @@ $base   = Join-Path $env:TEMP ("guarda-teste-" + $Porta)
 $dados  = Join-Path $base "pgdata"
 $log    = Join-Path $base "servidor.log"
 
-# Se ja tem algo escutando nessa porta, para aqui. Duas execucoes na mesma
+# Se já tem algo escutando nessa porta, para aqui. Duas execuções na mesma
 # porta compartilhariam a pasta de dados e uma derrubaria a outra pela metade.
 & $pgisready -h 127.0.0.1 -p $Porta -q
 if ($LASTEXITCODE -eq 0) {
-    Write-Error "Ja existe um servidor na porta $Porta. Escolha outra com -Porta, ou derrube o que esta la."
+    Write-Error "Já existe um servidor na porta $Porta. Escolha outra com -Porta, ou derrube o que está lá."
 }
 
 if (Test-Path $base) { Remove-Item $base -Recurse -Force }
@@ -63,13 +63,13 @@ Write-Host "criando cluster em $dados" -ForegroundColor Cyan
 
 Write-Host "subindo na porta $Porta" -ForegroundColor Cyan
 
-# Aqui nao se usa pg_ctl start, por dois motivos, os dois so no Windows:
+# Aqui não se usa pg_ctl start, por dois motivos, os dois só no Windows:
 #
-#   1. o postgres herda os handles de saida do pg_ctl, e se essa saida
-#      estiver num pipe do PowerShell o pipe so fecha quando o servidor
+#   1. o postgres herda os handles de saída do pg_ctl, e se essa saída
+#      estiver num pipe do PowerShell o pipe só fecha quando o servidor
 #      morrer, ou seja, nunca durante o script;
-#   2. Start-Process -NoNewWindow -Wait espera a arvore de processos toda,
-#      e o servidor e filho do pg_ctl, entao travaria do mesmo jeito.
+#   2. Start-Process -NoNewWindow -Wait espera a árvore de processos toda,
+#      e o servidor é filho do pg_ctl, então travaria do mesmo jeito.
 #
 # Subir o postgres.exe direto, sem esperar, e confirmar com pg_isready
 # resolve os dois.
@@ -88,7 +88,7 @@ foreach ($tentativa in 1..40) {
     Start-Sleep -Milliseconds 500
 }
 if (-not $pronto) {
-    Write-Error "O servidor nao respondeu na porta $Porta. Veja $log"
+    Write-Error "O servidor não respondeu na porta $Porta. Veja $log"
 }
 
 function Executar-Sql {
@@ -109,7 +109,7 @@ try {
         Executar-Sql -Arquivo (Join-Path $raiz "postgresql\$etapa") -ParaNoErro
     }
 
-    Write-Host "`nteste de aceitacao" -ForegroundColor Cyan
+    Write-Host "`nteste de aceitação" -ForegroundColor Cyan
     Executar-Sql -Arquivo (Join-Path $raiz "postgresql\90-teste-aceitacao.sql")
 
     $dsn = "host=127.0.0.1 port=$Porta dbname=$Banco user=postgres"

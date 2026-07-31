@@ -272,8 +272,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.host not in ("127.0.0.1", "localhost", "::1"):
         print(
-            f"guarda-painel: ATENCAO, escutando em {args.host}. Este painel liga e "
-            "desliga protecao de banco e nao tem autenticacao. Prefira tunel SSH.",
+            f"guarda-painel: ATENÇÃO, escutando em {args.host}. Este painel liga e "
+            "desliga proteção de banco e não tem autenticação. Prefira túnel SSH.",
             file=sys.stderr,
         )
 

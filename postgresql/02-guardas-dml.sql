@@ -148,7 +148,7 @@ begin
     -- registro do bloqueio vai para o log do servidor, que não é
     -- transacional. Ver docs/operacao.md para coletar isso.
     raise warning
-        'GUARDA bloqueou % em %.%: % linhas, limite %. usuario=% app=% host=% pid=%',
+        'GUARDA bloqueou % em %.%: % linhas, limite %. usuário=% app=% host=% pid=%',
         tg_op, tg_table_schema, tg_table_name, v_linhas, v_limite,
         session_user,
         coalesce(current_setting('application_name', true), '?'),
@@ -259,7 +259,7 @@ begin
     end if;
 
     raise warning
-        'GUARDA bloqueou TRUNCATE em %.%: usuario=% app=% host=%',
+        'GUARDA bloqueou TRUNCATE em %.%: usuário=% app=% host=%',
         tg_table_schema, tg_table_name, session_user,
         coalesce(current_setting('application_name', true), '?'),
         coalesce(host(inet_client_addr()), 'local');

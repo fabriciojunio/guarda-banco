@@ -137,7 +137,7 @@ EXEC guarda_teste.espera_bloqueio 'A3 WHERE amplo demais',
 EXEC guarda_teste.espera_sucesso  'A3b DELETE pequeno passa',
      N'DELETE FROM guarda_teste.item WHERE id <= 50';
 
-EXEC guarda_teste.espera_bloqueio 'A5 CASCADE alem do limite',
+EXEC guarda_teste.espera_bloqueio 'A5 CASCADE além do limite',
      N'DELETE FROM guarda_teste.pedido WHERE id <= 500';
 
 EXEC guarda_teste.espera_bloqueio 'A8 OR no lugar de AND',
@@ -161,7 +161,7 @@ EXEC guarda_teste.espera_bloqueio 'Justificativa curta recusada',
 GO
 
 /* liberação destrava, e só pela janela combinada */
-EXEC guarda.liberar N'teste de aceitacao do guarda, ticket interno';
+EXEC guarda.liberar N'teste de aceitação do guarda, ticket interno';
 GO
 
 EXEC guarda_teste.espera_sucesso 'Liberacao destrava DELETE grande',
@@ -177,12 +177,12 @@ GO
 /* TRUNCATE: aqui a defesa é permissão, não trigger. O teste confere
    que o script de permissões negou ALTER, que é o que TRUNCATE exige. */
 INSERT INTO guarda_teste.resultado
-SELECT 'A4 TRUNCATE depende de permissao',
+SELECT 'A4 TRUNCATE depende de permissão',
        CASE WHEN EXISTS (
             SELECT 1 FROM sys.database_permissions
              WHERE permission_name = 'ALTER' AND state_desc = 'DENY'
        ) THEN 'OK' ELSE 'FALHOU' END,
-       N'TRUNCATE nao dispara trigger no SQL Server. Precisa de DENY ALTER, ver 04-permissoes.sql';
+       N'TRUNCATE não dispara trigger no SQL Server. Precisa de DENY ALTER, ver 04-permissoes.sql';
 GO
 
 /* adoção automática de tabela nova */

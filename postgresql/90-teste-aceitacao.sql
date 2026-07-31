@@ -4,7 +4,7 @@
 -- Rode em HOMOLOGAÇÃO, com as etapas 01 a 04 já aplicadas.
 -- Cria o esquema guarda_teste, exercita as proteções e derruba no fim.
 --
---   psql -h host -U usuario -d banco -f 90-teste-aceitacao.sql
+--   psql -h host -U seu_usuario -d banco -f 90-teste-aceitacao.sql
 --
 -- Saída esperada: todas as linhas com "OK" e "falhas: 0" no fim.
 -- =====================================================================
@@ -148,7 +148,7 @@ select guarda_teste.espera_bloqueio(
     'truncate table guarda_teste.item');
 
 -- Liberação explícita destrava
-select guarda.liberar('teste de aceitacao do guarda, ticket interno');
+select guarda.liberar('teste de aceitação do guarda, ticket interno');
 select guarda_teste.espera_sucesso(
     'Liberação destrava DELETE grande',
     'delete from guarda_teste.item where valor > 0');
@@ -216,7 +216,7 @@ commit;
 -- Relatório
 -- ---------------------------------------------------------------------
 \echo ''
-\echo '================ resultado do teste de aceitacao ================'
+\echo '================ resultado do teste de aceitação ================'
 select caso, situacao, detalhe from guarda_teste.resultado order by caso;
 
 select count(*) filter (where situacao = 'OK')     as ok,

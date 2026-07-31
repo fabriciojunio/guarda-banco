@@ -3,7 +3,7 @@
 --
 -- Rode em HOMOLOGAÇÃO, com as etapas 01 a 03 já aplicadas.
 --
---   mysql -h host -u usuario -p < 90-teste-aceitacao.sql
+--   mysql -h host -u seu_usuario -p < 90-teste-aceitacao.sql
 --
 -- Saída esperada: todas as linhas com OK e falhas = 0.
 -- =====================================================================
@@ -128,7 +128,7 @@ BEGIN
         INSERT INTO guarda_teste.resultado VALUES (p_caso, 'OK', LEFT(v_msg, 200));
     ELSEIF v_erro = 1 THEN
         INSERT INTO guarda_teste.resultado
-            VALUES (p_caso, 'FALHOU', CONCAT('quem bloqueou nao foi o guard: ', LEFT(v_msg, 170)));
+            VALUES (p_caso, 'FALHOU', CONCAT('quem bloqueou não foi o guard: ', LEFT(v_msg, 170)));
     ELSE
         INSERT INTO guarda_teste.resultado
             VALUES (p_caso, 'FALHOU', 'passou e deveria ter sido bloqueado');
@@ -187,16 +187,16 @@ CALL guarda_teste.espera_bloqueio_guarda('A8 OR no lugar de AND',
 CALL guarda_teste.espera_bloqueio('Justificativa curta recusada',
     'CALL guarda.liberar(''oi'')');
 
-CALL guarda.liberar('teste de aceitacao do guarda, ticket interno');
+CALL guarda.liberar('teste de aceitação do guarda, ticket interno');
 
-CALL guarda_teste.espera_sucesso('Liberacao destrava DELETE grande',
+CALL guarda_teste.espera_sucesso('Liberação destrava DELETE grande',
     'DELETE FROM guarda_teste.item WHERE valor > 0 LIMIT 2000');
 
 -- Pegadinha operacional que vale ter fixada em teste: a liberação vale
 -- para o guard, não para o sql_safe_updates. Mesmo liberado, comando sem
 -- WHERE com chave e sem LIMIT continua recusado pelo servidor.
-CALL guarda.liberar('conferindo que liberar nao passa por cima do safe updates');
-CALL guarda_teste.espera_bloqueio('Liberacao nao burla o sql_safe_updates',
+CALL guarda.liberar('conferindo que liberar não passa por cima do safe updates');
+CALL guarda_teste.espera_bloqueio('Liberação não burla o sql_safe_updates',
     'DELETE FROM guarda_teste.item');
 
 CALL guarda.bloquear();
@@ -215,7 +215,7 @@ SELECT 'performance_schema identifica comando',
 
 -- auditoria das liberações
 INSERT INTO guarda_teste.resultado
-SELECT 'Auditoria registrou liberacao',
+SELECT 'Auditoria registrou liberação',
        IF(COUNT(*) >= 1, 'OK', 'FALHOU'),
        CONCAT(COUNT(*), ' evento(s) liberado(s)')
   FROM guarda.evento
@@ -223,9 +223,9 @@ SELECT 'Auditoria registrou liberacao',
 
 -- TRUNCATE e DROP: aqui não existe trigger, a defesa é privilégio
 INSERT INTO guarda_teste.resultado
-SELECT 'A4/B1 TRUNCATE e DROP dependem de privilegio',
-       'ATENCAO',
-       CONCAT('MySQL nao tem trigger de DDL. Confira guarda.quem_pode_truncate: ',
+SELECT 'A4/B1 TRUNCATE e DROP dependem de privilégio',
+       'ATENÇÃO',
+       CONCAT('MySQL não tem trigger de DDL. Confira guarda.quem_pode_truncate: ',
               (SELECT COUNT(*) FROM guarda.quem_pode_truncate), ' concessao(oes) de DROP');
 
 -- ---------------------------------------------------------------------
@@ -235,7 +235,7 @@ SELECT caso, situacao, detalhe FROM guarda_teste.resultado ORDER BY caso;
 
 SELECT SUM(situacao = 'OK')      AS ok,
        SUM(situacao = 'FALHOU')  AS falhas,
-       SUM(situacao = 'ATENCAO') AS atencao
+       SUM(situacao = 'ATENÇÃO') AS atencao
   FROM guarda_teste.resultado;
 
 -- ---------------------------------------------------------------------

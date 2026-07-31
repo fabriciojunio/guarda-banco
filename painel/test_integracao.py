@@ -149,7 +149,7 @@ class TestIntegracaoPostgres(unittest.TestCase):
         self.repositorio.salvar_tabela(
             esquema=ESQUEMA, tabela=TABELA, ativo=True,
             limite_delete=LIMITE, limite_update=LIMITE,
-            motivo="carga terminou, protecao de volta OS-4821", quem="teste-integracao",
+            motivo="carga terminou, proteção de volta OS-4821", quem="teste-integracao",
         )
         self.assertTrue(self._politica().ativo)
 

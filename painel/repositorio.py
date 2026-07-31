@@ -226,7 +226,7 @@ class RepositorioSQL:
             validar_limite(valor, chave)
         if chave in ("exigir_justificativa", "proteger_ddl", "exigir_performance_schema"):
             if valor not in ("sim", "nao"):
-                raise ErroDeUso(f"{chave} aceita apenas 'sim' ou 'nao'.")
+                raise ErroDeUso(f"{chave} aceita apenas os valores 'sim' ou 'nao', sem acento.")
 
         with self.conexao.cursor() as cur:
             cur.execute(self.SQL_UPDATE_CONFIG, (valor, chave))
@@ -550,7 +550,7 @@ class RepositorioMemoria:
             validar_limite(valor, chave)
         if chave in ("exigir_justificativa", "proteger_ddl", "exigir_performance_schema"):
             if valor not in ("sim", "nao"):
-                raise ErroDeUso(f"{chave} aceita apenas 'sim' ou 'nao'.")
+                raise ErroDeUso(f"{chave} aceita apenas os valores 'sim' ou 'nao', sem acento.")
         self._config[chave] = str(valor)
         self._eventos.insert(0, Evento(
             "2026-07-29 12:00:00", "configuracao", f"PAINEL CONFIG {chave}={valor}",

@@ -64,7 +64,7 @@ INSERT INTO mysql_query_rules
 VALUES
     (9006, 1,
      '(?i)(drop\s+trigger|set\s+(session\s+)?foreign_key_checks\s*=\s*0)',
-     'GUARDA: desativar protecao ou checagem de FK nao e permitido por aqui.',
+     'GUARDA: desativar proteção ou checagem de FK não é permitido por aqui.',
      1, 'guarda: B8 C4');
 
 LOAD MYSQL QUERY RULES TO RUNTIME;

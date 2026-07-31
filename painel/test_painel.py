@@ -241,7 +241,7 @@ class TestEscrita(BaseHTTP):
     def test_reativar_funciona(self):
         self.post("/api/tabela", {
             "esquema": "public", "tabela": "log_acesso", "ativo": True,
-            "motivo": "expurgo terminou, protecao de volta",
+            "motivo": "expurgo terminou, proteção de volta",
         }, token=self.token)
         _, texto, _ = self.get("/api/estado")
         self.assertEqual(json.loads(texto)["resumo"]["desativadas"], 0)
@@ -271,7 +271,7 @@ class TestEscrita(BaseHTTP):
 
     def test_corpo_invalido_da_400(self):
         pedido = urllib.request.Request(
-            self.url("/api/tabela"), data=b"nao sou json",
+            self.url("/api/tabela"), data="isso não é json".encode("utf-8"),
             headers={"Content-Type": "application/json", "X-Guarda-Token": self.token},
             method="POST",
         )

@@ -40,7 +40,7 @@ USING (VALUES
     ('papel_admin', N'guarda_admin',
      N'Papel de banco que faz DDL destrutivo sem passar pela liberação.'),
     ('proteger_ddl', N'sim',
-     N'Se nao, o DDL trigger para de bloquear e apenas registra.')
+     N'Se não, o DDL trigger para de bloquear e apenas registra.')
 ) AS origem (chave, valor, descricao)
    ON destino.chave = origem.chave
 WHEN NOT MATCHED THEN

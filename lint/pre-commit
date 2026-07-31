@@ -13,7 +13,7 @@ set -e
 LINT="$(git rev-parse --show-toplevel)/guarda-banco/lint/guarda_lint.py"
 
 if [ ! -f "$LINT" ]; then
-    echo "guarda-lint nao encontrado em $LINT, pulando." >&2
+    echo "guarda-lint não encontrado em $LINT, pulando." >&2
     exit 0
 fi
 

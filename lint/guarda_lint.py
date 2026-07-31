@@ -454,7 +454,7 @@ def coletar_arquivos(caminhos: list[str]) -> list[Path]:
         elif p.is_file():
             arquivos.append(p)
         else:
-            print(f"guarda-lint: caminho nao encontrado: {bruto}", file=sys.stderr)
+            print(f"guarda-lint: caminho não encontrado: {bruto}", file=sys.stderr)
     return arquivos
 
 

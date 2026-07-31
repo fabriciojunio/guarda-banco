@@ -39,7 +39,7 @@ BEGIN
         SET @motivo_bloqueio = N'objeto do esquema guarda';
 
     IF @evento = 'DROP_TRIGGER' AND @objeto LIKE 'guarda[_]dml[_]%'
-        SET @motivo_bloqueio = N'trigger de protecao do guarda';
+        SET @motivo_bloqueio = N'trigger de proteção do guarda';
 
     IF @evento = 'ALTER_TABLE' AND @texto LIKE '%DISABLE%TRIGGER%'
         SET @motivo_bloqueio = N'desativacao de trigger';
@@ -100,7 +100,7 @@ BEGIN
         EXEC guarda.instalar @esquema, @objeto;
     END TRY
     BEGIN CATCH
-        PRINT CONCAT('GUARDA: nao consegui proteger a tabela nova ',
+        PRINT CONCAT('GUARDA: não consegui proteger a tabela nova ',
                      @esquema, '.', @objeto, ' -> ', ERROR_MESSAGE());
     END CATCH
 END
@@ -133,7 +133,7 @@ BEGIN
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         DECLARE @msg nvarchar(600) = CONCAT(
             N'GUARDA: DROP DATABASE de ', @banco, N' bloqueado. ',
-            N'Remova a protecao no trigger guarda_srv_drop_database primeiro.');
+            N'Remova a proteção no trigger guarda_srv_drop_database primeiro.');
         THROW 50003, @msg, 1;
     END
 END

@@ -109,7 +109,7 @@ begin
             continue;
         end if;
 
-        raise warning 'GUARDA bloqueou % de % (%): usuario=% app=%',
+        raise warning 'GUARDA bloqueou % de % (%): usuário=% app=%',
             tg_tag, r.object_identity, r.object_type, session_user,
             coalesce(current_setting('application_name', true), '?');
 

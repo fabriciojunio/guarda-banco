@@ -19,7 +19,7 @@ BEGIN
 
     IF OBJECT_ID(QUOTENAME(@esquema) + '.' + QUOTENAME(@tabela), 'U') IS NULL
     BEGIN
-        DECLARE @erro nvarchar(300) = CONCAT('GUARDA: ', @esquema, '.', @tabela, ' nao existe.');
+        DECLARE @erro nvarchar(300) = CONCAT('GUARDA: ', @esquema, '.', @tabela, ' não existe.');
         THROW 50020, @erro, 1;
     END
 
@@ -28,7 +28,7 @@ BEGIN
                   AND is_memory_optimized = 1)
     BEGIN
         PRINT CONCAT('GUARDA: ', @esquema, '.', @tabela,
-                     ' e memory optimized e nao aceita trigger AFTER. Pulada.');
+                     ' é memory optimized e não aceita trigger AFTER. Pulada.');
         RETURN;
     END
 
@@ -185,7 +185,7 @@ SELECT s.name AS esquema,
        (SELECT SUM(ps.row_count)
           FROM sys.dm_db_partition_stats ps
          WHERE ps.object_id = t.object_id AND ps.index_id IN (0, 1)) AS linhas,
-       CASE WHEN t.is_memory_optimized = 1 THEN 'memory optimized, nao aceita trigger'
+       CASE WHEN t.is_memory_optimized = 1 THEN 'memory optimized, não aceita trigger'
             ELSE 'sem trigger do guarda' END AS motivo
   FROM sys.tables  t
   JOIN sys.schemas s ON s.schema_id = t.schema_id
