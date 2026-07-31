@@ -39,6 +39,91 @@ COMMIT;   -- ou ROLLBACK
 A liberação expira em 60 segundos (`janela_liberacao_seg`). Se você parar
 para pensar, ela fecha e é só chamar de novo.
 
+## Agendando o watchdog
+
+A proteção só continua de pé sozinha se alguém estiver conferindo. Em
+PostgreSQL e SQL Server isso é rede de segurança. No MySQL é obrigatório,
+porque tabela criada depois da instalação nasce desprotegida.
+
+Rode a cada 5 minutos. É barato: em banco íntegro são duas consultas de
+catálogo.
+
+### Linux, cron
+
+```cron
+*/5 * * * * cd /opt/guarda-banco && GUARDA_DSN="host=... user=guarda_watchdog password=..." \
+    /usr/bin/python3 ferramentas/rearmar.py --engine mysql --silencioso >> /var/log/guarda-rearmar.log 2>&1
+```
+
+### Linux, systemd timer
+
+```ini
+# /etc/systemd/system/guarda-rearmar.service
+[Unit]
+Description=Watchdog do guarda-banco
+
+[Service]
+Type=oneshot
+User=guarda
+WorkingDirectory=/opt/guarda-banco
+EnvironmentFile=/etc/guarda-banco/conexao.env
+ExecStart=/usr/bin/python3 ferramentas/rearmar.py --engine mysql --silencioso
+```
+
+```ini
+# /etc/systemd/system/guarda-rearmar.timer
+[Unit]
+Description=Roda o watchdog do guarda-banco a cada 5 minutos
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target
+```
+
+```bash
+systemctl enable --now guarda-rearmar.timer
+```
+
+### Windows, Agendador de Tarefas
+
+```powershell
+$acao = New-ScheduledTaskAction -Execute "python.exe" `
+    -Argument "ferramentas\rearmar.py --engine sqlserver --silencioso" `
+    -WorkingDirectory "C:\guarda-banco"
+$gatilho = New-ScheduledTaskTrigger -Once -At (Get-Date) `
+    -RepetitionInterval (New-TimeSpan -Minutes 5)
+Register-ScheduledTask -TaskName "guarda-banco watchdog" -Action $acao -Trigger $gatilho `
+    -User "DOMINIO\svc_guarda" -RunLevel Highest
+```
+
+### Ligando no monitoramento
+
+O código de saída serve direto para alerta:
+
+| Saída | Significado | O que fazer |
+|-------|-------------|-------------|
+| 0 | proteção íntegra | nada |
+| 1 | achou buraco (e consertou, se não for `--conferir`) | investigar **por que** abriu. Um buraco é normal no MySQL (tabela nova). Vários seguidos em PostgreSQL significam que alguém está mexendo. |
+| 2 | não conectou ou sem permissão | alerta de verdade: o watchdog está cego |
+
+Saída 2 é a mais séria. Sem watchdog rodando, ninguém percebe a proteção
+caindo. Monitore a **ausência** de execução, não só a falha.
+
+Para ver o histórico do que o watchdog consertou:
+
+```sql
+SELECT ocorrido_em, comando, justificativa, usuario
+  FROM guarda.evento
+ WHERE aplicacao = 'guarda-rearmar'
+ ORDER BY ocorrido_em DESC
+ LIMIT 50;
+```
+
+## Liberando uma operação grande de propósito
+
 ### MySQL
 
 ```sql

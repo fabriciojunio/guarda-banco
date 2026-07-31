@@ -76,11 +76,16 @@ jobs:
         working-directory: painel
         run: python -m unittest test_painel -v
 
-      - name: teste de integração do painel
+      - name: teste de integração do painel e do watchdog
         working-directory: painel
         env:
           GUARDA_DSN: "host=127.0.0.1 port=5432 dbname=lojateste user=postgres password=postgres"
         run: python -m unittest test_integracao -v
+
+      - name: watchdog não acusa nada num banco íntegro
+        env:
+          GUARDA_DSN: "host=127.0.0.1 port=5432 dbname=lojateste user=postgres password=postgres"
+        run: python ferramentas/rearmar.py --engine postgresql --conferir
 
   mysql:
     name: MySQL 8.4
@@ -88,6 +93,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
       # O contêiner é subido na mão, e não com services, para poder usar o
       # cliente mysql de dentro dele. O runner do Ubuntu traz o cliente do
@@ -137,3 +146,64 @@ jobs:
             echo "::error::o teste de aceitação reprovou"
             exit 1
           fi
+
+      # O MySQL não tem trigger de DDL: tabela criada depois da instalação
+      # nasce desprotegida. Quem fecha esse buraco é o watchdog, e é aqui
+      # que se prova que ele fecha mesmo.
+      - name: watchdog adota tabela criada depois da instalação
+        run: |
+          set -e
+          python -m pip install --quiet PyMySQL
+
+          M="docker exec -i guardamysql mysql -uroot -proot"
+          $M -e "CREATE DATABASE IF NOT EXISTS loja;
+                 CREATE TABLE loja.pedido (id INT PRIMARY KEY, valor DECIMAL(10,2));
+                 INSERT INTO loja.pedido VALUES (1, 10), (2, 20);"
+
+          echo "::group::sem o watchdog, a tabela esta desprotegida"
+          $M -e "SELECT COUNT(*) AS triggers_na_tabela FROM information_schema.TRIGGERS
+                  WHERE EVENT_OBJECT_SCHEMA='loja' AND EVENT_OBJECT_TABLE='pedido';"
+          $M -e "SELECT COUNT(*) AS tabelas_sem_protecao FROM guarda.sem_protecao;"
+          echo "::endgroup::"
+
+          export GUARDA_DSN="host=127.0.0.1 port=3306 user=root password=root dbname=guarda"
+
+          # --conferir tem que acusar e sair com 1, sem consertar
+          set +e
+          python ferramentas/rearmar.py --engine mysql --conferir
+          codigo=$?
+          set -e
+          if [ "$codigo" != "1" ]; then
+            echo "::error::--conferir deveria ter saido com 1, saiu com $codigo"
+            exit 1
+          fi
+
+          # agora conserta de verdade
+          set +e
+          python ferramentas/rearmar.py --engine mysql
+          codigo=$?
+          set -e
+          if [ "$codigo" != "1" ]; then
+            echo "::error::o rearme deveria ter saido com 1, saiu com $codigo"
+            exit 1
+          fi
+
+          # e a segunda passada nao acha mais nada
+          python ferramentas/rearmar.py --engine mysql --conferir
+
+          echo "::group::depois do watchdog"
+          $M -e "SELECT TRIGGER_NAME FROM information_schema.TRIGGERS
+                  WHERE EVENT_OBJECT_SCHEMA='loja' AND EVENT_OBJECT_TABLE='pedido';"
+          echo "::endgroup::"
+
+          faltando=$($M -sN -e "SELECT COUNT(*) FROM guarda.sem_protecao;")
+          if [ "$faltando" != "0" ]; then
+            echo "::error::ainda ha $faltando tabela(s) sem protecao depois do rearme"
+            exit 1
+          fi
+
+      - name: watchdog deixa rastro na auditoria
+        run: |
+          docker exec -i guardamysql mysql -uroot -proot -e \
+            "SELECT comando, justificativa, aplicacao FROM guarda.evento
+              WHERE aplicacao = 'guarda-rearmar' ORDER BY id DESC LIMIT 3;"

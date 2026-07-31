@@ -143,6 +143,53 @@ Confira o diagnóstico antes de considerar instalado:
 CALL guarda.diagnostico();
 ```
 
+## Depois de ligado, continua ligado
+
+Esta é a promessa do sistema, e ela é levada a sério: uma vez instalada, a
+proteção fica de pé sozinha até uma pessoa desligar de propósito. Não cai
+sozinha, não expira, não depende de ninguém lembrar de nada.
+
+O que sustenta isso:
+
+| Risco de a proteção cair | O que segura |
+|--------------------------|--------------|
+| Servidor reiniciou | Trigger e política moram no catálogo do banco, não em memória. Testado com reinício de verdade. |
+| Alguém criou uma tabela nova | PostgreSQL e SQL Server adotam na hora, por trigger de DDL. MySQL não tem isso, e por isso existe o watchdog. |
+| Alguém tentou remover ou desabilitar a trigger | Bloqueado em PostgreSQL e SQL Server, e registrado. Casos B8 do teste de aceitação. |
+| Liberação esquecida ligada | Impossível: `guarda.liberar()` vale só na transação atual (PostgreSQL) ou expira em 60 segundos (SQL Server e MySQL). Fechar sozinha é o padrão. |
+| Sessão nova, conexão nova, cliente diferente | Irrelevante. A proteção é do servidor, não da sessão. |
+| Alguém removeu na marra, com superusuário | O watchdog devolve na próxima passada e deixa rastro na auditoria. |
+
+O único jeito de a proteção parar é alguém desligar explicitamente, pelo
+painel ou por `UPDATE` em `guarda.politica`, e isso exige justificativa e
+fica registrado com nome e horário.
+
+### Watchdog
+
+```bash
+python ferramentas/rearmar.py --engine mysql --conferir   # só relata
+python ferramentas/rearmar.py --engine mysql              # relata e conserta
+```
+
+Ele procura tabela sem trigger, trigger desabilitada, event trigger que
+sumiu e, no MySQL, `sql_safe_updates` desligado. Devolve o que faltar.
+
+A regra que ele nunca quebra: **tabela desligada de propósito continua
+desligada.** O watchdog repõe a trigger que sumiu, mas jamais mexe em
+`guarda.politica.ativo`. Quem desligou foi uma pessoa, e só uma pessoa
+religa. Sem isso ele atrapalharia a carga noturna que alguém desligou de
+propósito, e aí o time desinstalaria o guard inteiro.
+
+Código de saída pensado para monitoramento: `0` tudo certo, `1` achou (ou
+consertou) algo, `2` não conseguiu conectar. Para agendar, ver
+[docs/operacao.md](docs/operacao.md).
+
+No PostgreSQL e no SQL Server o watchdog é rede de segurança, porque o
+banco já se adota sozinho. **No MySQL ele é obrigatório**: sem trigger de
+DDL, e sem `CREATE TRIGGER` em prepared statement, não existe forma de o
+MySQL se rearmar por dentro. Toda tabela criada depois da instalação nasce
+desprotegida até o watchdog passar.
+
 ## Painel
 
 Tela para ver a situação e ligar ou desligar a proteção sem precisar

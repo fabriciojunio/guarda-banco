@@ -16,7 +16,9 @@ DSN. Aponte para homologação.
 """
 
 import os
+import sys
 import unittest
+from pathlib import Path
 
 import repositorio as repo
 
@@ -220,6 +222,198 @@ class TestIntegracaoPostgres(unittest.TestCase):
                 "registrar_acima_de", original,
                 "devolvendo o valor original do teste", "teste",
             )
+
+
+@unittest.skipUnless(DSN, "defina GUARDA_DSN para rodar o teste de integração")
+@unittest.skipUnless(ENGINE.startswith("postgres"), "por enquanto só PostgreSQL")
+class TestWatchdog(unittest.TestCase):
+    """A promessa é: depois de ligado, continua ligado até uma pessoa desligar.
+
+    Quem sustenta isso quando alguém remove a trigger na marra é o
+    ferramentas/rearmar.py. Estes testes derrubam a proteção de propósito e
+    conferem que ela volta, e que o watchdog respeita quem foi desligado
+    de propósito.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        import psycopg
+
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ferramentas"))
+        import rearmar
+
+        cls.rearmar = rearmar
+        cls.psycopg = psycopg
+        cls.conexao = psycopg.connect(DSN, autocommit=False)
+
+        with cls.conexao.cursor() as cur:
+            cur.execute("select guarda.manutencao()")
+            cur.execute(f"drop schema if exists {ESQUEMA}_wd cascade")
+            cur.execute(f"create schema {ESQUEMA}_wd")
+            cur.execute(
+                f"create table {ESQUEMA}_wd.{TABELA} "
+                "(id integer primary key, valor numeric(10,2) default 10)"
+            )
+            cur.execute(
+                f"insert into {ESQUEMA}_wd.{TABELA} (id) "
+                f"select g from generate_series(1, {LINHAS}) g"
+            )
+            cur.execute("select guarda.instalar(%s, %s)", (f"{ESQUEMA}_wd", TABELA))
+            cur.execute(f"analyze {ESQUEMA}_wd.{TABELA}")
+        cls.conexao.commit()
+
+    @classmethod
+    def tearDownClass(cls):
+        with cls.conexao.cursor() as cur:
+            cur.execute("select guarda.manutencao()")
+            cur.execute("delete from guarda.politica where esquema = %s", (f"{ESQUEMA}_wd",))
+            cur.execute("delete from guarda.evento where esquema = %s", (f"{ESQUEMA}_wd",))
+            cur.execute("delete from guarda.evento where aplicacao = 'guarda-rearmar'")
+            cur.execute(f"drop schema if exists {ESQUEMA}_wd cascade")
+        cls.conexao.commit()
+        cls.conexao.close()
+
+    def setUp(self):
+        """Cada teste começa com a proteção armada e ativa.
+
+        Sem isto os testes dependeriam da ordem em que o unittest resolve
+        rodá-los, que é alfabética e pode mudar.
+        """
+        with self.conexao.cursor() as cur:
+            cur.execute("select guarda.manutencao()")
+            cur.execute("select guarda.instalar(%s, %s)", (f"{ESQUEMA}_wd", TABELA))
+            cur.execute(
+                """
+                insert into guarda.politica (esquema, tabela, ativo)
+                values (%s, %s, true)
+                on conflict (esquema, tabela) do update set ativo = true
+                """,
+                (f"{ESQUEMA}_wd", TABELA),
+            )
+            cur.execute("delete from guarda.evento where aplicacao = 'guarda-rearmar'")
+        self.conexao.commit()
+
+    # -- utilidades -------------------------------------------------------
+    def _vigia(self):
+        vigia, repositorio = self.rearmar.criar_vigia("postgresql", DSN)
+        return vigia, repositorio
+
+    def _derrubar_protecao(self):
+        with self.conexao.cursor() as cur:
+            cur.execute("select guarda.manutencao()")
+            cur.execute(
+                f"drop trigger guarda_conta_delete on {ESQUEMA}_wd.{TABELA}"
+            )
+            cur.execute(
+                f"drop trigger guarda_ini_delete on {ESQUEMA}_wd.{TABELA}"
+            )
+        self.conexao.commit()
+
+    def _delete_grande_passa(self) -> bool:
+        with self.psycopg.connect(DSN, autocommit=False) as conexao:
+            try:
+                with conexao.cursor() as cur:
+                    cur.execute(f"delete from {ESQUEMA}_wd.{TABELA} where valor > 0")
+                passou = True
+            except self.psycopg.errors.RaiseException:
+                passou = False
+            conexao.rollback()
+        return passou
+
+    # -- testes -----------------------------------------------------------
+    def test_estado_integro_nao_acusa_nada(self):
+        vigia, repositorio = self._vigia()
+        try:
+            self.assertEqual(vigia.conferir(), [])
+        finally:
+            repositorio.fechar()
+
+    def test_watchdog_devolve_a_protecao_removida(self):
+        self.assertFalse(self._delete_grande_passa(), "deveria estar protegida")
+
+        self._derrubar_protecao()
+        self.assertTrue(self._delete_grande_passa(),
+                        "sem trigger, o DELETE grande deveria passar")
+
+        vigia, repositorio = self._vigia()
+        try:
+            achados = vigia.conferir()
+            self.assertEqual(len(achados), 1)
+            self.assertEqual(achados[0].tipo, "tabela sem trigger")
+            vigia.corrigir(achados)
+            self.assertTrue(achados[0].corrigido)
+        finally:
+            repositorio.fechar()
+
+        self.assertFalse(self._delete_grande_passa(),
+                         "depois do rearme o DELETE grande tem que voltar a ser bloqueado")
+
+    def test_modo_conferir_nao_altera_nada(self):
+        self._derrubar_protecao()
+        try:
+            codigo = self.rearmar.main(
+                ["--engine", "postgresql", "--dsn", DSN, "--conferir"]
+            )
+            self.assertEqual(codigo, 1, "achou problema, entao sai com 1")
+            self.assertTrue(self._delete_grande_passa(),
+                            "--conferir nao pode ter consertado")
+        finally:
+            self.rearmar.main(["--engine", "postgresql", "--dsn", DSN, "--silencioso"])
+
+    def test_nao_religa_o_que_foi_desligado_de_proposito(self):
+        repositorio = self.rearmar.repo.RepositorioPostgres.conectar(DSN)
+        try:
+            repositorio.salvar_tabela(
+                esquema=f"{ESQUEMA}_wd", tabela=TABELA, ativo=False,
+                limite_delete=None, limite_update=None,
+                motivo="carga noturna, desligado de proposito OS-5000", quem="gestor",
+            )
+
+            self.assertTrue(self._delete_grande_passa(),
+                            "desligado pelo painel, o DELETE grande passa")
+
+            codigo = self.rearmar.main(["--engine", "postgresql", "--dsn", DSN])
+            self.assertEqual(codigo, 0, "nao ha buraco: a trigger continua instalada")
+
+            alvo = next(t for t in repositorio.tabelas()
+                        if t.esquema == f"{ESQUEMA}_wd" and t.tabela == TABELA)
+            self.assertFalse(alvo.ativo, "o watchdog nao pode religar sozinho")
+            self.assertTrue(alvo.instalada, "a trigger tem que continuar instalada")
+        finally:
+            repositorio.salvar_tabela(
+                esquema=f"{ESQUEMA}_wd", tabela=TABELA, ativo=True,
+                limite_delete=None, limite_update=None,
+                motivo="devolvendo o estado do teste automatizado", quem="teste",
+            )
+            repositorio.fechar()
+
+    def test_saida_zero_quando_esta_tudo_certo(self):
+        codigo = self.rearmar.main(
+            ["--engine", "postgresql", "--dsn", DSN, "--silencioso"]
+        )
+        self.assertEqual(codigo, 0)
+
+    def test_registra_na_auditoria_o_que_consertou(self):
+        # o setUp acabou de limpar os eventos do watchdog, entao o que
+        # aparecer aqui foi este teste que gerou
+        self._derrubar_protecao()
+        self.rearmar.main(["--engine", "postgresql", "--dsn", DSN, "--silencioso"])
+
+        with self.psycopg.connect(DSN) as conexao:
+            with conexao.cursor() as cur:
+                cur.execute(
+                    """
+                    select comando, justificativa, aplicacao
+                      from guarda.evento
+                     where aplicacao = 'guarda-rearmar'
+                     order by id desc limit 1
+                    """
+                )
+                linha = cur.fetchone()
+
+        self.assertIsNotNone(linha, "o watchdog tem que deixar rastro")
+        self.assertEqual(linha[0], "WATCHDOG CORRIGIU")
+        self.assertIn(TABELA, linha[1])
 
 
 if __name__ == "__main__":
