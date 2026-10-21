@@ -2,7 +2,7 @@ name: testes
 
 on:
   push:
-    branches: [main]
+    branches: ["produção", "homologação"]
   pull_request:
   workflow_dispatch:
 
